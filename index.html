@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FitSphere - Fitness Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+</head>
+<body>
+  <header class="main-header">
+    <div class="header-center">
+      <i class="fas fa-dumbbell"></i>
+      <span class="site-title">FitSphere</span>
+    </div>
+    <div class="header-right" id="header-account-area">
+      <span id="user-display" class="user-display"></span>
+      <button onclick="logout()" class="btn-secondary logout-btn-top"><i class="fas fa-sign-out-alt"></i></button>
+    </div>
+    <div class="header-motivation" id="header-motivation"></div>
+  </header>
+  <div id="auth-screen" class="screen">
+    <!-- Motivational quote at top center -->
+    <script>document.getElementById('header-motivation').innerText = 'Every step is progress. Welcome to FitSphere!';</script>
+    <div class="auth-container">
+      <div class="logo">
+        <i class="fas fa-dumbbell"></i>
+        <h1>FitSphere</h1>
+      </div>
+      <div class="auth-form">
+        <input type="text" id="username" placeholder="Enter your name" />
+        <input type="number" id="age" placeholder="Enter your age" min="5" max="120" />
+        <div class="gender-toggle-group">
+          <label>Gender:</label>
+          <button type="button" class="gender-btn" data-gender="male" onclick="selectGender('male')">Male</button>
+          <button type="button" class="gender-btn" data-gender="female" onclick="selectGender('female')">Female</button>
+          <button type="button" class="gender-btn" data-gender="other" onclick="selectGender('other')">Other</button>
+          <input type="hidden" id="gender" value="" />
+        </div>
+        <div class="height-group">
+          <input type="number" id="height-feet" placeholder="Height (ft)" min="3" max="8" style="width: 48%; display: inline-block;" />
+          <input type="number" id="height-inches" placeholder="Height (in)" min="0" max="11" style="width: 48%; display: inline-block; margin-left: 2%;" />
+        </div>
+        <input type="number" id="weight-lbs" placeholder="Weight (lbs)" min="50" max="700" />
+        <div class="pro-toggle">
+          <label for="pro-version">Unlock Pro features</label>
+          <input type="checkbox" id="pro-version" />
+        </div>
+        <button onclick="login()" class="btn-primary">
+          <i class="fas fa-sign-in-alt"></i> Get Started
+        </button>
+        <div class="motivational-login">
+          <p id="motivational-login-text">"Every step is progress. Welcome to FitSphere!"</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-screen" class="screen hidden">
+    <nav class="main-nav">
+      <button class="nav-btn" id="tab-home" onclick="switchTab('home')"><i class="fas fa-home"></i> Home</button>
+      <button class="nav-btn" id="tab-nutrition" onclick="switchTab('nutrition')"><i class="fas fa-apple-alt"></i> Nutrition</button>
+      <button class="nav-btn" id="tab-sleep" onclick="switchTab('sleep')"><i class="fas fa-bed"></i> Sleep</button>
+    </nav>
+    <div id="tab-content-home">
+    <!-- Motivational quote at top center -->
+    <script>document.getElementById('header-motivation').innerText = 'Push yourself, because no one else is going to do it for you.';</script>
+    <div class="motivational-home">
+      <p id="motivational-home-text">"Push yourself, because no one else is going to do it for you."</p>
+    </div>
+    <div class="leaderboard-section">
+      <h2><i class="fas fa-trophy"></i> Leaderboard</h2>
+      <div class="leaderboard-controls">
+        <label for="leaderboard-activity">Activity:</label>
+        <select id="leaderboard-activity" onchange="updateLeaderboard()">
+          <option value="Running">Running</option>
+          <option value="Cycling">Cycling</option>
+          <option value="Swimming">Swimming</option>
+          <option value="Walking">Walking</option>
+          <option value="Hiking">Hiking</option>
+          <option value="Climbing">Climbing</option>
+        </select>
+        <label for="leaderboard-group">Group:</label>
+        <select id="leaderboard-group" onchange="updateLeaderboard()">
+          <option value="all">All</option>
+          <option value="male-Youth">Male - Youth</option>
+          <option value="male-Young Adult">Male - Young Adult</option>
+          <option value="male-Adult">Male - Adult</option>
+          <option value="male-Senior">Male - Senior</option>
+          <option value="female-Youth">Female - Youth</option>
+          <option value="female-Young Adult">Female - Young Adult</option>
+          <option value="female-Adult">Female - Adult</option>
+          <option value="female-Senior">Female - Senior</option>
+          <option value="other-Youth">Other - Youth</option>
+          <option value="other-Young Adult">Other - Young Adult</option>
+          <option value="other-Adult">Other - Adult</option>
+          <option value="other-Senior">Other - Senior</option>
+        </select>
+      </div>
+      <div id="leaderboard-list" class="leaderboard-list"></div>
+    </div>
+    <header class="app-header">
+      <div class="user-info">
+        <i class="fas fa-user-circle"></i>
+        <span id="user-display"></span>
+      </div>
+      <button onclick="logout()" class="btn-secondary logout-btn-top">
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </header>
+
+    <main class="app-main">
+      <div class="dashboard">
+        <div class="stats-cards">
+          <div class="stat-card">
+            <i class="fas fa-clock"></i>
+            <h3>Total Time</h3>
+            <p id="total-time">0h 0m</p>
+          </div>
+          <div class="stat-card">
+            <i class="fas fa-route"></i>
+            <h3>Total Distance</h3>
+            <p id="total-distance">0 km</p>
+          </div>
+          <div class="stat-card">
+            <i class="fas fa-fire"></i>
+            <h3>Workouts</h3>
+            <p id="total-workouts">0</p>
+          </div>
+        </div>
+
+        <div class="workout-section">
+          <h2><i class="fas fa-play-circle"></i> Start Workout</h2>
+          <div class="workout-controls">
+            <div class="activity-selector">
+              <label for="activity">Activity Type:</label>
+              <select id="activity">
+                <option value="Running">🏃‍♂️ Running</option>
+                <option value="Cycling">🚴‍♂️ Cycling</option>
+                <option value="Swimming">🏊‍♂️ Swimming</option>
+                <option value="Walking">🚶‍♂️ Walking</option>
+                <option value="Hiking">🥾 Hiking</option>
+                <option value="Climbing">🧗‍♂️ Climbing</option>
+              </select>
+            </div>
+            
+            <div class="timer-display">
+              <div class="time-display">
+                <span id="hours">00</span>:<span id="minutes">00</span>:<span id="seconds">00</span>
+              </div>
+              <div class="current-stats">
+                <div class="stat">
+                  <i class="fas fa-route"></i>
+                  <span id="distance">0.00</span> km
+                </div>
+                <div class="stat">
+                  <i class="fas fa-tachometer-alt"></i>
+                  <span id="speed">0.0</span> km/h
+                </div>
+              </div>
+            </div>
+
+            <div class="control-buttons">
+              <button id="start-btn" onclick="startWorkout()" class="btn-primary">
+                <i class="fas fa-play"></i> Start
+              </button>
+              <button id="pause-btn" onclick="pauseWorkout()" class="btn-secondary hidden">
+                <i class="fas fa-pause"></i> Pause
+              </button>
+              <button id="stop-btn" onclick="stopWorkout()" class="btn-danger hidden">
+                <i class="fas fa-stop"></i> Stop
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="history-section">
+          <h2><i class="fas fa-history"></i> Workout History</h2>
+          <div class="history-controls">
+            <button onclick="clearHistory()" class="btn-secondary">
+              <i class="fas fa-trash"></i> Clear History
+            </button>
+            <button onclick="exportData()" class="btn-secondary">
+              <i class="fas fa-download"></i> Export
+            </button>
+          </div>
+          <div class="workout-charts">
+            <canvas id="workout-chart"></canvas>
+          </div>
+          <div id="history-list" class="history-list"></div>
+        </div>
+      </div>
+    </main>
+    </div>
+    <div id="tab-content-nutrition" class="hidden">
+      <div class="nutrition-section">
+        <h2><i class="fas fa-apple-alt"></i> Nutrition Tracker</h2>
+        <p>Track your food, calories, macros, vitamins, sweeteners, and caffeine here.</p>
+        <div class="nutrition-controls">
+          <input type="text" id="food-input" placeholder="Enter food name or brand..." />
+          <button class="btn-primary" onclick="addFoodEntry()"><i class="fas fa-plus"></i> Add</button>
+          <button class="btn-secondary" onclick="toggleBarcodeScanner()"><i class="fas fa-barcode"></i> Scan</button>
+          <button class="btn-secondary" onclick="shareNutrition()"><i class="fas fa-share"></i> Share</button>
+        </div>
+        <div id="barcode-scanner" class="barcode-scanner hidden">
+          <div class="scanner-container">
+            <div id="interactive" class="viewport"></div>
+            <button class="btn-danger" onclick="closeBarcodeScanner()"><i class="fas fa-times"></i> Close</button>
+          </div>
+        </div>
+        <div class="nutrition-charts">
+          <canvas id="nutrition-chart"></canvas>
+        </div>
+        <div class="nutrition-summary">
+          <div><strong>Calories:</strong> <span id="nutrition-calories">0</span> kcal</div>
+          <div><strong>Macros:</strong> <span id="nutrition-macros">-</span></div>
+          <div><strong>Vitamins:</strong> <span id="nutrition-vitamins">-</span></div>
+          <div><strong>Sweeteners:</strong> <span id="nutrition-sweeteners">-</span></div>
+          <div><strong>Caffeine:</strong> <span id="nutrition-caffeine">-</span> mg</div>
+        </div>
+        <div class="nutrition-log">
+          <h3>Food Log</h3>
+          <ul id="nutrition-log-list"></ul>
+        </div>
+      </div>
+    </div>
+    <div id="tab-content-sleep" class="hidden">
+      <div class="sleep-section">
+        <h2><i class="fas fa-bed"></i> Sleep & Recovery</h2>
+        <p>Track your sleep and recovery for optimal performance.</p>
+        <div class="sleep-controls">
+          <input type="number" id="sleep-hours" placeholder="Hours slept" min="0" max="24" step="0.1" />
+          <select id="sleep-quality">
+            <option value="">Quality</option>
+            <option value="Excellent">Excellent</option>
+            <option value="Good">Good</option>
+            <option value="Fair">Fair</option>
+            <option value="Poor">Poor</option>
+          </select>
+          <button class="btn-primary" onclick="addSleepEntry()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <div class="sleep-summary">
+          <div><strong>Average Sleep:</strong> <span id="sleep-average">-</span> hours</div>
+          <div><strong>Recovery Tip:</strong> <span id="sleep-tip">Get 7-9 hours for optimal recovery!</span></div>
+        </div>
+        <div class="sleep-log">
+          <h3>Sleep Log</h3>
+          <ul id="sleep-log-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
