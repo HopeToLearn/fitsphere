@@ -490,7 +490,7 @@ function updateLeaderboard() {
   const group = document.getElementById('leaderboard-group').value;
   const leaderboardList = document.getElementById('leaderboard-list');
 
-  // Aggregate by user, activity, and group
+  // Aggregate by user, activity, and group - show total time (greatest amount)
   const userWorkouts = {};
   (JSON.parse(localStorage.getItem('workouts') || '[]')).forEach(w => {
     if (w.activity !== activity) return;
@@ -502,7 +502,7 @@ function updateLeaderboard() {
     userWorkouts[name].total += w.time;
     userWorkouts[name].calories += w.calories || 0;
   });
-  // Convert to array and sort by total time descending
+  // Convert to array and sort by total time descending (greatest amount)
   const sorted = Object.values(userWorkouts).sort((a, b) => b.total - a.total);
 
   leaderboardList.innerHTML = '';
@@ -523,114 +523,46 @@ function updateLeaderboard() {
   });
 }
 
-// Real Nutrition Data Lookup & Barcode Scanning
-let nutritionChart = null;
-let workoutChart = null;
-
-async function searchFoodDatabase(query) {
+// USDA FoodData Central API Integration
+async function searchUSDADatabase(query, servingSize) {
   try {
-    const response = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`);
+    // USDA FoodData Central API endpoint
+    const response = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=DEMO_KEY&query=${encodeURIComponent(query)}&pageSize=5`);
     const data = await response.json();
-    if (data.products && data.products.length > 0) {
-      const product = data.products[0];
+    
+    if (data.foods && data.foods.length > 0) {
+      const food = data.foods[0];
+      const nutrients = food.foodNutrients || [];
+      
+      // Extract nutrients per 100g
+      const calories = nutrients.find(n => n.nutrientName === 'Energy')?.value || 0;
+      const protein = nutrients.find(n => n.nutrientName === 'Protein')?.value || 0;
+      const carbs = nutrients.find(n => n.nutrientName === 'Carbohydrate, by difference')?.value || 0;
+      const fat = nutrients.find(n => n.nutrientName === 'Total lipid (fat)')?.value || 0;
+      const fiber = nutrients.find(n => n.nutrientName === 'Fiber, total dietary')?.value || 0;
+      const sugar = nutrients.find(n => n.nutrientName === 'Sugars, total including NLEA')?.value || 0;
+      
+      // Calculate based on serving size
+      const servingMultiplier = servingSize / 100; // USDA data is per 100g
+      
       return {
-        name: product.product_name || query,
-        calories: product.nutriments?.energy_100g ? Math.round(product.nutriments.energy_100g / 4.184) : 0,
-        protein: product.nutriments?.proteins_100g || 0,
-        carbs: product.nutriments?.carbohydrates_100g || 0,
-        fat: product.nutriments?.fat_100g || 0,
-        vitamins: extractVitamins(product),
-        sweeteners: hasSweeteners(product),
-        caffeine: product.nutriments?.caffeine_100g || 0
+        name: food.description || query,
+        calories: Math.round(calories * servingMultiplier),
+        protein: Math.round(protein * servingMultiplier * 10) / 10,
+        carbs: Math.round(carbs * servingMultiplier * 10) / 10,
+        fat: Math.round(fat * servingMultiplier * 10) / 10,
+        fiber: Math.round(fiber * servingMultiplier * 10) / 10,
+        sugar: Math.round(sugar * servingMultiplier * 10) / 10,
+        servingSize: servingSize
       };
     }
   } catch (error) {
-    console.error('Error fetching food data:', error);
+    console.error('Error fetching USDA data:', error);
   }
   return null;
 }
 
-function extractVitamins(product) {
-  const vitamins = [];
-  if (product.nutriments?.vitamin_a_100g) vitamins.push('A');
-  if (product.nutriments?.vitamin_c_100g) vitamins.push('C');
-  if (product.nutriments?.vitamin_d_100g) vitamins.push('D');
-  if (product.nutriments?.vitamin_e_100g) vitamins.push('E');
-  if (product.nutriments?.vitamin_b1_100g) vitamins.push('B1');
-  if (product.nutriments?.vitamin_b2_100g) vitamins.push('B2');
-  if (product.nutriments?.vitamin_b6_100g) vitamins.push('B6');
-  if (product.nutriments?.vitamin_b12_100g) vitamins.push('B12');
-  return vitamins.join(', ') || 'None detected';
-}
-
-function hasSweeteners(product) {
-  const sweetenerKeywords = ['aspartame', 'sucralose', 'saccharin', 'acesulfame', 'stevia'];
-  const ingredients = (product.ingredients_text || '').toLowerCase();
-  return sweetenerKeywords.some(keyword => ingredients.includes(keyword)) ? 'Yes' : 'No';
-}
-
-function toggleBarcodeScanner() {
-  const scanner = document.getElementById('barcode-scanner');
-  scanner.classList.toggle('hidden');
-  if (!scanner.classList.contains('hidden')) {
-    startBarcodeScanner();
-  } else {
-    stopBarcodeScanner();
-  }
-}
-
-function startBarcodeScanner() {
-  Quagga.init({
-    inputStream: {
-      name: "Live",
-      type: "LiveStream",
-      target: document.querySelector('#interactive'),
-      constraints: {
-        width: 480,
-        height: 320,
-        facingMode: "environment"
-      },
-    },
-    decoder: {
-      readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader", "upc_reader"]
-    }
-  }, function(err) {
-    if (err) {
-      console.error('Scanner error:', err);
-      showNotification('Camera access denied or not available', 'error');
-      return;
-    }
-    Quagga.start();
-  });
-
-  Quagga.onDetected(async function(result) {
-    const code = result.codeResult.code;
-    stopBarcodeScanner();
-    document.getElementById('barcode-scanner').classList.add('hidden');
-    
-    showNotification('Barcode detected! Searching database...', 'info');
-    const foodData = await searchFoodDatabase(code);
-    if (foodData) {
-      document.getElementById('food-input').value = foodData.name;
-      showNotification(`Found: ${foodData.name}`, 'success');
-    } else {
-      showNotification('Product not found in database', 'error');
-    }
-  });
-}
-
-function stopBarcodeScanner() {
-  if (Quagga) {
-    Quagga.stop();
-  }
-}
-
-function closeBarcodeScanner() {
-  stopBarcodeScanner();
-  document.getElementById('barcode-scanner').classList.add('hidden');
-}
-
-// Enhanced Nutrition Tracking with Real Data
+// Enhanced Nutrition Tracking with USDA Data
 async function addFoodEntry() {
   const foodInput = document.getElementById('food-input');
   const food = foodInput.value.trim();
@@ -639,17 +571,24 @@ async function addFoodEntry() {
     return;
   }
 
-  showNotification('Searching food database...', 'info');
-  const foodData = await searchFoodDatabase(food);
+  // Ask for serving size
+  const servingSize = prompt('Enter serving size in grams (e.g., 100 for 100g):');
+  if (!servingSize || isNaN(servingSize) || servingSize <= 0) {
+    showNotification('Please enter a valid serving size in grams.', 'error');
+    return;
+  }
+
+  showNotification('Searching USDA food database...', 'info');
+  const foodData = await searchUSDADatabase(food, parseFloat(servingSize));
   
   if (foodData) {
     const entry = {
       food: foodData.name,
       calories: foodData.calories,
       macros: `C: ${foodData.carbs}g, P: ${foodData.protein}g, F: ${foodData.fat}g`,
-      vitamins: foodData.vitamins,
-      sweeteners: foodData.sweeteners,
-      caffeine: foodData.caffeine,
+      fiber: foodData.fiber,
+      sugar: foodData.sugar,
+      servingSize: foodData.servingSize,
       date: new Date().toLocaleString()
     };
     const log = JSON.parse(localStorage.getItem('nutritionLog') || '[]');
@@ -658,15 +597,15 @@ async function addFoodEntry() {
     foodInput.value = '';
     updateNutritionLog();
     updateNutritionChart();
-    showNotification(`Added: ${foodData.name} (${foodData.calories} kcal)`, 'success');
+    showNotification(`Added: ${foodData.name} (${foodData.calories} kcal, ${foodData.servingSize}g)`, 'success');
   } else {
     // Fallback to mock data
     const mockData = {
       calories: Math.floor(Math.random() * 300) + 50,
       macros: 'C: 20g, P: 5g, F: 8g',
-      vitamins: 'A, C, D',
-      sweeteners: Math.random() > 0.7 ? 'Yes' : 'No',
-      caffeine: Math.random() > 0.8 ? 80 : 0
+      fiber: Math.floor(Math.random() * 10) + 1,
+      sugar: Math.floor(Math.random() * 20) + 1,
+      servingSize: parseFloat(servingSize)
     };
     const entry = {
       food,
@@ -730,23 +669,22 @@ function updateNutritionLog() {
   const log = JSON.parse(localStorage.getItem('nutritionLog') || '[]');
   const list = document.getElementById('nutrition-log-list');
   let totalCalories = 0;
-  let macros = [], vitamins = [], sweeteners = 0, caffeine = 0;
+  let macros = [], fiber = 0, sugar = 0;
   list.innerHTML = '';
   log.forEach(entry => {
     totalCalories += entry.calories;
     macros.push(entry.macros);
-    if (entry.vitamins) vitamins.push(entry.vitamins);
-    if (entry.sweeteners === 'Yes') sweeteners++;
-    caffeine += entry.caffeine;
+    fiber += entry.fiber || 0;
+    sugar += entry.sugar || 0;
     const li = document.createElement('li');
-    li.innerHTML = `<b>${entry.food}</b> <span style='color:#888;'>${entry.date}</span> - <span>${entry.calories} kcal</span> <span>${entry.macros}</span> <span>Vit: ${entry.vitamins}</span> <span>${entry.caffeine ? entry.caffeine + 'mg caffeine' : ''}</span> <span>${entry.sweeteners === 'Yes' ? 'Sweetener' : ''}</span>`;
+    li.innerHTML = `<b>${entry.food}</b> <span style='color:#888;'>${entry.date}</span> - <span>${entry.calories} kcal</span> <span>${entry.macros}</span> <span>Fiber: ${entry.fiber || 0}g</span> <span>Sugar: ${entry.sugar || 0}g</span> <span>(${entry.servingSize}g)</span>`;
     list.appendChild(li);
   });
   document.getElementById('nutrition-calories').innerText = totalCalories;
   document.getElementById('nutrition-macros').innerText = macros.length ? macros[0] + (macros.length > 1 ? ' ...' : '') : '-';
-  document.getElementById('nutrition-vitamins').innerText = vitamins.length ? vitamins[0] + (vitamins.length > 1 ? ' ...' : '') : '-';
-  document.getElementById('nutrition-sweeteners').innerText = sweeteners;
-  document.getElementById('nutrition-caffeine').innerText = caffeine;
+  document.getElementById('nutrition-vitamins').innerText = `Fiber: ${fiber.toFixed(1)}g, Sugar: ${sugar.toFixed(1)}g`;
+  document.getElementById('nutrition-sweeteners').innerText = '-';
+  document.getElementById('nutrition-caffeine').innerText = '-';
 }
 
 // Social Sharing Features
@@ -886,7 +824,6 @@ window.onload = () => {
     updateLeaderboard();
     updateNutritionLog();
     updateSleepLog();
-    updateMotivationalQuote();
   }
   
   // Add keyboard shortcuts
@@ -903,3 +840,4 @@ window.onload = () => {
     }
   });
 };
+
